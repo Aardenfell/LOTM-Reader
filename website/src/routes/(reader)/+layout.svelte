@@ -119,6 +119,72 @@
   let mainContainer: HTMLDivElement;
   let navbarRef: any;
 
+  // --- Giscus Rate-Limit & Error Mitigation ---
+  let giscusStatus = $state<"loading" | "success" | "error">("loading");
+  let giscusTimeoutId: any = null;
+
+  // Listen for Giscus events via postMessage
+  $effect(() => {
+    if (!browser) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== "https://giscus.app") return;
+      const giscusData = event.data.giscus;
+      if (!giscusData) return;
+
+      if ("error" in giscusData) {
+        console.warn("Giscus reported an error:", giscusData.error);
+        giscusStatus = "error";
+        if (giscusTimeoutId) {
+          clearTimeout(giscusTimeoutId);
+          giscusTimeoutId = null;
+        }
+      } else if ("discussion" in giscusData) {
+        giscusStatus = "success";
+        if (giscusTimeoutId) {
+          clearTimeout(giscusTimeoutId);
+          giscusTimeoutId = null;
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  });
+
+  // Watch for navigation/chapter changes to start 4-second timeout check
+  $effect(() => {
+    if (!prefs.config.showComments) return;
+    
+    // Explicit dependencies for reactivity on navigate/chapter change
+    const id = githubID;
+    const slug = bookSlug;
+
+    giscusStatus = "loading";
+
+    if (browser) {
+      if (giscusTimeoutId) {
+        clearTimeout(giscusTimeoutId);
+      }
+      giscusTimeoutId = setTimeout(() => {
+        if (giscusStatus === "loading") {
+          console.warn(`Giscus timed out loading comments for discussion ${id}`);
+          giscusStatus = "error";
+        }
+      }, 4000);
+    }
+
+    return () => {
+      if (giscusTimeoutId) {
+        clearTimeout(giscusTimeoutId);
+        giscusTimeoutId = null;
+      }
+    };
+  });
+
   // 1. Parse URL manually (since page.params is empty)
   // Split path, filter out empty strings to handle trailing slashes
   // URL: /read/coi/webnovel/1 -> ["read", "coi", "webnovel", "1"]
@@ -337,22 +403,59 @@
 
   {#if prefs.config.showComments}
   <div id="comments" class="sm:mx-auto mx-0 max-w-5xl sm:px-6 px-3 pb-6 scroll-mt-20">
-    <Giscus
-      id="comments"
-      repo="bittu5134/lotm-reader"
-      repoId="R_kgDORObHsw"
-      category={bookSlug.toUpperCase()}
-      categoryId={bookSlug === "LOTM"
-        ? "DIC_kwDORObHs84C2RKd"
-        : "DIC_kwDORObHs84C2RKe"}
-      mapping="number"
-      term={String(githubID)}
-      reactionsEnabled="1"
-      emitMetadata="0"
-      inputPosition="top"
-      theme={getGiscusTheme(prefs.config.theme)}
-      lang="en"
-    />
+    {#if giscusStatus === "error"}
+      <div class="alert alert-warning border border-warning/20 bg-warning/5 text-warning-content shadow-lg p-6 rounded-box flex flex-col md:flex-row items-center md:items-start gap-4 mb-6">
+        <div class="flex-shrink-0 text-warning">
+          <Icon icon="heroicons:exclamation-triangle-solid" class="size-8" />
+        </div>
+        <div class="flex-1 text-center md:text-left">
+          <h3 class="font-bold text-lg tracking-wide">Unable to load comments</h3>
+          <p class="text-sm mt-1 opacity-80 leading-relaxed max-w-2xl">
+            Comments are temporarily unavailable due to system rate limits. 
+            You can log in below to authorize requests using your personal account quota, or view the discussion directly.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-3 justify-center md:justify-start">
+            <a
+              href={`https://giscus.app/api/oauth/authorize?redirect_uri=${encodeURIComponent(
+                browser ? window.location.href : ""
+              )}#comments`}
+              class="btn btn-warning btn-sm hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              <Icon icon="material-symbols:login-rounded" class="size-4" />
+              Log In to view comments
+            </a>
+            <a
+              href={`https://github.com/bittu5134/lotm-reader/discussions/${githubID}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-outline btn-warning btn-sm hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              <Icon icon="material-symbols:open-in-new" class="size-4" />
+              Open Discussion Page
+            </a>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <div class={giscusStatus === "error" ? "hidden" : ""}>
+      <Giscus
+        id="comments"
+        repo="bittu5134/lotm-reader"
+        repoId="R_kgDORObHsw"
+        category={bookSlug.toUpperCase()}
+        categoryId={bookSlug === "LOTM"
+          ? "DIC_kwDORObHs84C2RKd"
+          : "DIC_kwDORObHs84C2RKe"}
+        mapping="number"
+        term={String(githubID)}
+        reactionsEnabled="1"
+        emitMetadata="1"
+        inputPosition="top"
+        theme={getGiscusTheme(prefs.config.theme)}
+        lang="en"
+      />
+    </div>
   </div>
   {/if}
 </div>
