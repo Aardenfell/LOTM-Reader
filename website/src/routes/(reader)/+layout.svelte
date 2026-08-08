@@ -293,7 +293,22 @@
   const bookSlug = $derived(pathSegments[1] ?? "lotm");
   const currentTL = $derived(pathSegments[2] ?? "webnovel");
   const currentChapter = $derived(Number(pathSegments[3]) || 1);
-  let githubID = $derived(readerState.ch_meta.discussion || 1);
+
+  // Derive chapter metadata directly from meta.json based on URL (ensuring SSR & crawler accuracy)
+  const currentChapterMeta = $derived.by(() => {
+    const chapters = (bookData as any)[bookSlug]?.[currentTL];
+    if (!Array.isArray(chapters)) return null;
+
+    const idx = currentChapter - 1;
+    if (chapters[idx] && Number(chapters[idx].slug) === currentChapter) {
+      return chapters[idx];
+    }
+    return chapters.find((ch: any) => Number(ch.slug) === currentChapter) || chapters[idx] || null;
+  });
+
+  const chapterSlug = $derived(currentChapterMeta?.slug ?? readerState.ch_meta.slug ?? currentChapter);
+  const chapterTitle = $derived(currentChapterMeta?.title || readerState.ch_meta.title || "");
+  const githubID = $derived(currentChapterMeta?.discussion || readerState.ch_meta.discussion || 1);
 
   // 3. Get Total Chapters for the current TL
   const totalChapters = $derived(
@@ -432,10 +447,15 @@
 </script>
 
 <svelte:head>
-  <title>{bookSlug.toUpperCase()} {readerState.ch_meta.slug} — {readerState.ch_meta.title}</title>
+  <title>{bookSlug.toUpperCase()} {chapterSlug}{chapterTitle ? ` — ${chapterTitle}` : ""}</title>
+  <meta name="description" content={`Read ${bookSlug.toUpperCase()} Chapter ${chapterSlug}${chapterTitle ? `: ${chapterTitle}` : ""} online.`} />
   <meta property="og:type" content="article" />
-  <meta property="og:title" content="{bookSlug.toUpperCase()} {readerState.ch_meta.slug} — {readerState.ch_meta.title}" />
-  <meta name="twitter:title" content="{bookSlug.toUpperCase()} {readerState.ch_meta.slug} — {readerState.ch_meta.title}" />
+  <meta property="og:site_name" content="LOTM Reader" />
+  <meta property="og:title" content="{bookSlug.toUpperCase()} {chapterSlug}{chapterTitle ? ` — ${chapterTitle}` : ""}" />
+  <meta property="og:description" content={`Read ${bookSlug.toUpperCase()} Chapter ${chapterSlug}${chapterTitle ? `: ${chapterTitle}` : ""} online.`} />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="{bookSlug.toUpperCase()} {chapterSlug}{chapterTitle ? ` — ${chapterTitle}` : ""}" />
+  <meta name="twitter:description" content={`Read ${bookSlug.toUpperCase()} Chapter ${chapterSlug}${chapterTitle ? `: ${chapterTitle}` : ""} online.`} />
 </svelte:head>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -481,7 +501,7 @@
       </a>
 
       <span class="text-xs font-mono font-bold opacity-50 tracking-wider">
-        CH. {readerState.ch_meta.slug}
+        CH. {chapterSlug}
       </span>
 
       <a
