@@ -8,7 +8,7 @@ from better_profanity import profanity
 
 def main():
     # --- ONLINE PROFANITY LIST SETUP ---
-    PROFANITY_URL = "https://raw.githubusercontent.com/dsojevic/profanity-list/refs/heads/main/en.txt"
+    PROFANITY_URL = "https://raw.githubusercontent.com/Bittu5134/ORV-Reader/refs/heads/main/scripts/others/filtered_profanity.txt"
     WHITELIST = {"word1", "word2"}
     CUSTOM_TRIGGERS = ["spoiler", "spoil", "bittu", "realnpc"]
 
