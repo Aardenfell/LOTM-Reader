@@ -38,11 +38,12 @@ for path in paths:
         print(f"Processing section: {section} ({len(chapters[section])} chapters)")
         content = ""
         for chapter in chapters[section]:
-            chapter = chapter["content"].strip()
-            content += f"""{chapter}
+            chapter_content = chapter["content"].strip()
+            discussion_id = chapter["discussion"]
+            content += f"""{chapter_content}
 
 ___
-- [Read Comments](https://github.com/Bittu5134/LOTM-Reader/discussions/{metadata["discussion"]})
+- [Read Comments](https://github.com/Bittu5134/LOTM-Reader/discussions/{discussion_id})
 - [Discord](https://discord.gg/XmzJVsyuTQ)
 
 """
